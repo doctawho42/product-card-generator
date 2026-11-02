@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Черновик карточки товара</title>
+  <style>
+    body { margin: 0; background: #f5f6f8; color: #1f2328; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 17px; margin: 28px 0 8px; }
+    h3 { font-size: 15px; margin: 0 0 6px; }
+    .lead { color: #57606a; margin: 0 0 20px; }
+    .panel { background: #fff; border: 1px solid #d8dee4; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+    label { display: block; font-weight: 600; margin: 14px 0 4px; }
+    label small { font-weight: 400; color: #57606a; }
+    input, textarea { box-sizing: border-box; width: 100%; padding: 8px 10px; border: 1px solid #d0d7de; border-radius: 6px; font: inherit; }
+    textarea { min-height: 110px; resize: vertical; }
+    textarea.output { min-height: 220px; font: 13px/1.45 ui-monospace, Menlo, monospace; background: #f6f8fa; }
+    .buttons { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+    button { padding: 8px 16px; border-radius: 6px; border: 1px solid #d0d7de; background: #f6f8fa; font: inherit; cursor: pointer; }
+    button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .hint, .meta { color: #57606a; font-size: 13px; }
+    .error { background: #ffebe9; border: 1px solid #ff818266; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
+    .warning { background: #fff8c5; border: 1px solid #d4a72c66; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+    .note { background: #ddf4ff; border: 1px solid #54aeff66; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+    .warning ul, .note ul { margin: 0; padding-left: 20px; }
+    .seo-title { font-size: 18px; font-weight: 600; margin: 0; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #d8dee4; vertical-align: top; }
+    td.missing { color: #9a6700; }
+    td.source { color: #57606a; font-size: 13px; white-space: nowrap; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Черновик карточки товара</h1>
+  <p class="lead">Заполните данные о приборе — сервис подготовит SEO-тексты, таблицу характеристик и справку для менеджера. Значения характеристик берутся только из этих данных.</p>
+
+  <form class="panel" method="post" action="/#result">
+    <label for="name">Название <small>обязательно</small></label>
+    <input id="name" name="name" value="{{ form.name or '' }}" required>
+
+    <label for="manufacturer">Производитель</label>
+    <input id="manufacturer" name="manufacturer" value="{{ form.manufacturer or '' }}">
+
+    <label for="specs">Характеристики <small>по одной в строке: «название: значение»</small></label>
+    <textarea id="specs" name="specs" placeholder="Диапазон измерений: 0–1,6 МПа&#10;Класс точности: 1,5">{{ form.specs or '' }}</textarea>
+
+    <label for="description">Описание или фрагмент паспорта</label>
+    <textarea id="description" name="description">{{ form.description or '' }}</textarea>
+
+    <div class="buttons">
+      <button class="primary" type="submit">Подготовить карточку</button>
+      <button type="button" id="example">Подставить пример</button>
+      <span class="hint" id="status">Модель отвечает от 20 секунд до нескольких минут.</span>
+    </div>
+  </form>
+
+  <div id="result"></div>
+  {% if error %}
+    <div class="error">{{ error }}</div>
+  {% endif %}
+
+  {% if card %}
+    <section class="panel">
+      {% if card.warnings %}
+        <div class="warning">
+          <h3>Проверьте перед публикацией</h3>
+          <ul>{% for item in card.warnings %}<li>{{ item }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+      {% if card.to_clarify %}
+        <div class="note">
+          <h3>Что уточнить</h3>
+          <ul>{% for item in card.to_clarify %}<li>{{ item }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      <h2>SEO-заголовок</h2>
+      <p class="seo-title">{{ card.seo_title }}</p>
+      <p class="meta">Длина {{ card.seo_title|length }} (норма до {{ TITLE_MAX }} символов)</p>
+
+      <h2>SEO-описание</h2>
+      {% for paragraph in card.seo_description.split("\n") if paragraph.strip() %}
+        <p>{{ paragraph }}</p>
+      {% endfor %}
+      <p class="meta">Длина {{ card.seo_description|length }} (норма {{ DESCRIPTION_MIN }}–{{ DESCRIPTION_MAX }} символов)</p>
+
+      <h2>Характеристики</h2>
+      <table>
+        <tr><th>Характеристика</th><th>Значение</th><th>Источник</th></tr>
+        {% for spec in card.specs %}
+          <tr>
+            <td>{{ spec.name }}</td>
+            <td class="{{ spec.source }}">{{ spec.value }}</td>
+            <td class="source">{{ SOURCE_LABELS[spec.source] }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+
+      <h2>Поисковые запросы</h2>
+      <ul>{% for query in card.search_queries %}<li>{{ query }}</li>{% endfor %}</ul>
+
+      <h2>Для менеджера</h2>
+      <h3>Кому подходит</h3>
+      <ul>{% for item in card.commercial.audience %}<li>{{ item }}</li>{% endfor %}</ul>
+      <h3>Какие задачи решает</h3>
+      <ul>{% for item in card.commercial.tasks %}<li>{{ item }}</li>{% endfor %}</ul>
+
+      <h2>Markdown</h2>
+      <textarea class="output" id="markdown" readonly>{{ card.to_markdown() }}</textarea>
+      <div class="buttons"><button type="button" data-copy="markdown">Скопировать Markdown</button></div>
+
+      <h2>JSON</h2>
+      <textarea class="output" id="json" readonly>{{ card.model_dump_json(indent=2) }}</textarea>
+      <div class="buttons"><button type="button" data-copy="json">Скопировать JSON</button></div>
+    </section>
+  {% endif %}
+</main>
+
+<script>
+  const example = {
+    name: "Манометр показывающий DM 02",
+    manufacturer: "Манотомь",
+    specs: "Диапазон измерений: 0–1,6 МПа\nКласс точности: 1,5\nПрисоединение: G1/2\nДиаметр корпуса: 100 мм",
+    description: "Прибор предназначен для измерения избыточного давления неагрессивных жидкостей, газов и паров.",
+  };
+  document.getElementById("example").addEventListener("click", () => {
+    for (const [field, value] of Object.entries(example)) document.getElementById(field).value = value;
+  });
+
+  document.querySelector("form").addEventListener("submit", (event) => {
+    event.submitter.disabled = true;
+    document.getElementById("status").textContent = "Готовлю карточку…";
+  });
+
+  for (const button of document.querySelectorAll("[data-copy]")) {
+    button.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(document.getElementById(button.dataset.copy).value);
+      button.textContent = "Скопировано";
+    });
+  }
+</script>
+</body>
+</html>
